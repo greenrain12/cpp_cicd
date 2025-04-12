@@ -8,18 +8,28 @@ jobs:
   check-change:
     runs-on: ubuntu-latest
     steps:
-      - name: Get latest commit SHA
-        id: sha
-        run: |
-          curl -s https://api.github.com/repos/greenrain78/TraceRecoviz/commits/main \
-            | jq -r '.sha' > latest.txt
+      - name: Checkout
+        uses: actions/checkout@v3
 
-          if [ -f old.txt ] && cmp -s latest.txt old.txt; then
-            echo "changed=false" >> $GITHUB_OUTPUT
+      - name: Get latest commit SHA and detect change
+        id: check
+        run: |
+          curl -s https://api.github.com/repos/greenrain78/TraceRecoviz/commits/main | jq -r '.sha' > latest.txt
+          
+          echo "Latest SHA: $(cat latest.txt)"
+
+          if [ -f old.txt ]; then
+            if cmp -s latest.txt old.txt; then
+              echo "changed=false" >> $GITHUB_ENV
+            else
+              echo "changed=true" >> $GITHUB_ENV
+              cp latest.txt old.txt
+            fi
           else
-            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "changed=true" >> $GITHUB_ENV
             cp latest.txt old.txt
+          fi
 
       - name: Echo if changed
-        if: steps.sha.outputs.changed == 'true'
-        run: echo "✅ TraceRecoviz 저장소에 변경이 감지되었습니다."
+        if: env.changed == 'true'
+        run: echo "✅ TraceRecoviz 저장소에 변경이 감지되었습니다!"
