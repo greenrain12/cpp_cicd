@@ -1,0 +1,25 @@
+name: Detect TraceRecoviz Change
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+
+jobs:
+  check-change:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get latest commit SHA
+        id: sha
+        run: |
+          curl -s https://api.github.com/repos/greenrain78/TraceRecoviz/commits/main \
+            | jq -r '.sha' > latest.txt
+
+          if [ -f old.txt ] && cmp -s latest.txt old.txt; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            cp latest.txt old.txt
+
+      - name: Echo if changed
+        if: steps.sha.outputs.changed == 'true'
+        run: echo "✅ TraceRecoviz 저장소에 변경이 감지되었습니다."
