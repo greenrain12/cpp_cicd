@@ -2,34 +2,45 @@ name: Detect TraceRecoviz Change
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/2 * * * *'  # 5분마다 워크플로우 실행
 
 jobs:
   check-change:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repo  # 현재 저장소 체크아웃 (old.txt 파일 접근 목적)
         uses: actions/checkout@v3
 
-      - name: Get latest commit SHA and detect change
-        id: check
+      - name: Get latest commit SHA  # TraceRecoviz 저장소의 main 브랜치 최신 커밋 SHA 조회 및 변경 여부 판단
+        id: get-sha
         run: |
-          curl -s https://api.github.com/repos/greenrain78/TraceRecoviz/commits/main | jq -r '.sha' > latest.txt
-          
-          echo "Latest SHA: $(cat latest.txt)"
+          mkdir -p .trace
+          curl -s https://api.github.com/repos/greenrain78/TraceRecoviz/commits/main \
+            | jq -r '.sha' > .trace/latest.txt
 
-          if [ -f old.txt ]; then
-            if cmp -s latest.txt old.txt; then
-              echo "changed=false" >> $GITHUB_ENV
-            else
-              echo "changed=true" >> $GITHUB_ENV
-              cp latest.txt old.txt
+          echo "Latest SHA: $(cat .trace/latest.txt)"
+
+          # 이전 SHA가 저장되어 있다면 비교
+          if [ -f .trace/old.txt ]; then
+            if cmp -s .trace/latest.txt .trace/old.txt; then
+              echo "changed=false" >> $GITHUB_ENV  # 변경 없음
+              exit 0
             fi
-          else
-            echo "changed=true" >> $GITHUB_ENV
-            cp latest.txt old.txt
           fi
 
-      - name: Echo if changed
+          # 변경 감지됨: 상태 갱신
+          echo "changed=true" >> $GITHUB_ENV
+          cp .trace/latest.txt .trace/old.txt
+
+      - name: Commit updated SHA  # 변경 시 최신 SHA 저장 및 커밋
+        if: env.changed == 'true'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .trace/old.txt
+          git commit -m "Update last seen TraceRecoviz commit SHA"
+          git push
+
+      - name: Echo if changed  # 변경 감지되었을 때 메시지 출력
         if: env.changed == 'true'
         run: echo "✅ TraceRecoviz 저장소에 변경이 감지되었습니다!"
